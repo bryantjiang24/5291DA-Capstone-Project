@@ -1,0 +1,49 @@
+---
+title: "Untitled"
+author: "Jianxun Guo"
+date: "2022/4/23"
+output: html_document
+---
+
+```{r}
+library(tidyverse)
+data_new<-read_csv('cleaned_US_new.csv') %>% rename("category" = "category_name") %>% select(-`...1`)
+by_date_new <- data_new %>% dplyr::select(-publishedAt, -categoryId, -category, -video_id) %>% 
+  group_by(trending_date) %>% summarise_each(list(sum)) %>% 
+  mutate(perc = percent_rank(view_count))
+by_date_new <- by_date_new %>% filter(perc>0.05 & perc<0.95) %>% select(-perc)
+data <- read_csv('cleaned_US.csv') %>% rename("category" = "category_name") %>% select(-`...1`)
+by_date <- data %>% dplyr::select(-publishedAt, -categoryId, -category, -video_id) %>% 
+  group_by(trending_date) %>% summarise_each(list(sum)) %>% 
+  mutate(perc = percent_rank(view_count))
+by_date <- by_date %>% filter(perc>0.05 & perc<0.95) %>% select(-perc)
+```
+
+```{r}
+time <- seq(1,length(by_date$trending_date),1)
+plot(time, by_date$view_count,type="l")
+m1 <- lm(log(view_count) ~ poly(time,degree = 2,raw = T),data=by_date)
+X_resid <- residuals(m1)[c(400:519)]
+plot(time, residuals(m1),type="l")
+time <- seq(1,length(X_resid),1)
+t1 <- sin(0.2*time)
+t2 <- cos(0.2*time)
+harmonic_model <- lm(X_resid ~ I(t1)+I(t2)+I(time)+I(time^2),data=by_date)
+plot_y <-  predict(harmonic_model,data.frame(time))
+plot(time,X_resid, main="120 days",ylab="Y",xlab="time",type="l")
+lines(time,plot_y,col="blue")
+```
+
+```{r}
+new.data <- seq(121,240,1)
+prediction <- predict(harmonic_model, as.data.frame(new.data))
+```
+
+```{r}
+library(forecast)
+arima(x=X_resid,order=c(2,0,10))
+myforecast<-forecast(arima(x=X_resid,order=c(2,0,10)),level=c(95),h=20)
+plot(myforecast)
+```
+
+
